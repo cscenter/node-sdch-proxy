@@ -2,10 +2,8 @@
 var debug = require('debug')('node-sdch-proxy');
 var express = require('express');
 var fs = require('fs');
-var path = require('path');
 var url = require('url');
 var zlib = require('zlib');
-var compression = require('compression');
 var request = require('superagent')
 var logger = require('morgan');
 var sdch = require('sdch');
@@ -18,7 +16,7 @@ var dicts = [
     url: 'http://ru.wikipedia.org/some-wikipedia-dict-sldkfjlskdjflsk',
     domain: 'ru.wikipedia.org',
     data: fs.readFileSync('model.fzm')
-  }),
+  })
 ]
 // Создаем хранилище словарей
 var storage = new connectSdch.DictionaryStorage(dicts);
@@ -72,7 +70,6 @@ app.use(connectSdch.serve(storage));
 
 // прокся
 app.get('/*', function(req, res, next) { // get по любому url
-    res.setHeader('content-type', 'text/html');
     res.setHeader('Via', 'My-precious-proxy');
     request.get(req.url)  // проксируем get
         .set(req.headers)
@@ -94,13 +91,6 @@ app.get('/*', function(req, res, next) { // get по любому url
 });
 
 module.exports = app;
-
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-    var err = new Error('Not Found');
-    err.status = 404;
-    next(err);
-});
 
 // error handlers
 
