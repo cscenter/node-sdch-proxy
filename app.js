@@ -31,8 +31,6 @@ var sdchLog = fs.createWriteStream(__dirname + '/logs/sdch.log', {flags: 'w'})
 // Middleware
 
 // setup the logger
-//app.use(function(req,res){ console.log(req.headers); })
-
 logger.token('hostname', function(req, res){ return url.parse(req.url).hostname })
 
 app.use(logger('common',
@@ -69,10 +67,10 @@ app.use(connectSdch.encode({
     // toEncode определяет какой словарь будет использован для шифрования ответа
     toEncode: function(req, availDicts) {
         // Use only first dictionary
-        //if (availDicts.length > 0 &&
-          //  availDicts[0] === dicts[0].clientHash)
+        if (availDicts.length > 0 &&
+            availDicts[0] === dicts[0].clientHash)
             return dicts[0]
-       // return null;
+        return null;
     }
 }, { /* some vcdiff options */ }));
 
@@ -97,7 +95,6 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
             for (var k in resp.headers) {
                 res.setHeader(k, resp.headers[k]);
             }
-            //res.setHeader("content-encoding", 'sdch')
             p.pipe(res);
         }).end();
 });
