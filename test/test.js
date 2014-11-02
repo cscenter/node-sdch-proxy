@@ -1,7 +1,7 @@
 var assert = require('chai').assert;
 var http = require('http');
 var sdch = require('sdch');
-var config = require('../config');
+var config = require('config-node')();
 var proxy = require('../app');
 var test_server = require('../test-server');
 
@@ -20,11 +20,11 @@ describe('Node-sdch-proxy tests:', function() {
 
         before(function (done) {
             http.get({
-                host: config.PROXY.HOST,
-                port: config.PROXY.PORT,
-                path: "http://" + config.SERVER.HOST + ":" + config.SERVER.PORT + "/test1",
+                host: config.proxy_host,
+                port: config.proxy_port,
+                path: "http://" + config.test_server_host + ":" + config.test_server_port + "/test1",
                 headers: {
-                    Host: config.SERVER.HOST
+                    Host: config.test_server_host
                 }
             }, function (res) {
                 resp = res;
@@ -61,11 +61,11 @@ describe('Node-sdch-proxy tests:', function() {
     describe('Initial Interaction, User Agent has No Dictionaries', function () {
         before(function (done) {
             http.get({
-                host: config.PROXY.HOST,
-                port: config.PROXY.PORT,
-                path: "http://" + config.SERVER.HOST + ":" + config.SERVER.PORT + "/test2",
+                host: config.proxy_host,
+                port: config.proxy_port,
+                path: "http://" + config.test_server_host + ":" + config.test_server_port + "/test2",
                 headers: {
-                    Host: config.SERVER.HOST,
+                    Host: config.test_server_host,
                     'Accept-Encoding': 'sdch, gzip'
                 }
             }, function (res) {
@@ -106,11 +106,11 @@ describe('Node-sdch-proxy tests:', function() {
     describe('User Agent Requests the Dictionary', function () {
         before(function (done) {
             http.get({
-                host: config.PROXY.HOST,
-                port: config.PROXY.PORT,
-                path: "http://" + config.SERVER.HOST + ":" + config.SERVER.PORT + dict,
+                host: config.proxy_host,
+                port: config.proxy_port,
+                path: "http://" + config.test_server_host + ":" + config.test_server_port + dict,
                 headers: {
-                    Host: config.SERVER.HOST,
+                    Host: config.test_server_host,
                     'Accept-Encoding': 'sdch, gzip'
                 }
             }, function (res) {
@@ -139,7 +139,7 @@ describe('Node-sdch-proxy tests:', function() {
             })
 
             it('valid dictionary headers', function () {
-                var url = "http://" + config.SERVER.HOST + ":" + config.SERVER.PORT + dict
+                var url = "http://" + config.test_server_host + ":" + config.test_server_port + dict
                 assert.doesNotThrow(function () {
                     var opts = sdch.createDictionaryOptions(url, resp.body)
                     var dict = sdch.clientUtils.createDictionaryFromOptions(opts)
@@ -152,11 +152,11 @@ describe('Node-sdch-proxy tests:', function() {
     describe('User Requests Page AND User Agent Has Already Downloaded the Dictionary', function () {
         before(function (done) {
             http.get({
-                host: config.PROXY.HOST,
-                port: config.PROXY.PORT,
-                path: "http://" + config.SERVER.HOST + ":" + config.SERVER.PORT + '/search&q=brussel',
+                host: config.proxy_host,
+                port: config.proxy_port,
+                path: "http://" + config.test_server_host + ":" + config.test_server_port + '/search&q=brussel',
                 headers: {
-                    Host: config.SERVER.HOST,
+                    Host: config.test_server_host,
                     'Accept-Encoding': 'sdch',
                     'Avail-Dictionary': 'TWFuIGlz'
                 }
@@ -174,7 +174,7 @@ describe('Node-sdch-proxy tests:', function() {
             it("have via == 'My-precious-proxy'", function () {
                 assert.equal('My-precious-proxy', resp.headers['via'])
             })
-            
+
             it("have content-type == 'text/plain'", function () {
                 assert.equal('text/plain', resp.headers['content-type']);
             })
