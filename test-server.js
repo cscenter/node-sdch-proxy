@@ -37,8 +37,8 @@ var server = http.createServer(function(req,resp){
 })
 
 function run() {
-    server.listen(config.test_server_port, config.test_server_host);
-    console.log("test-server listening on port " + config.test_server_port);
+    server.listen(config.testServerPort, config.testServerHost);
+    console.log("test-server listening on port " + config.testServerPort);
 }
 
 if (module.parent) {

@@ -1,10 +1,10 @@
 {
-    "proxy_host": "kotik.cc",
-    "proxy_port": 3002,
-    "test_server_host": "kotik.cc",
-    "test_server_port": 7272,
-    "dictionart_path": "/dictionaries/search_dict",
-    "dictionary_file": "model.fzm",
-    "dictionary_rootdir": "/Users/glips/Workspace/node-ws/node-sdch-proxy/pages",
+    "proxyHost": "kotik.cc",
+    "proxyPort": 3002,
+    "testServerHost": "kotik.cc",
+    "testServerPort": 7272,
+    "dictionartPath": "/dictionaries/search_dict",
+    "dictionaryFile": "model.fzm",
+    "dictionaryRootdir": "./pages",
     "domains": ["www.yandex.ru", "ru.wikipedia.org"]
 }

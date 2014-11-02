@@ -21,10 +21,10 @@ describe('Node-sdch-proxy tests:', function() {
         before(function (done) {
             http.get({
                 host: config.proxy_host,
-                port: config.proxy_port,
-                path: "http://" + config.test_server_host + ":" + config.test_server_port + "/test1",
+                port: config.proxyPort,
+                path: "http://" + config.testServerHost + ":" + config.testServerPort + "/test1",
                 headers: {
-                    Host: config.test_server_host
+                    Host: config.testServerHost
                 }
             }, function (res) {
                 resp = res;
@@ -61,11 +61,11 @@ describe('Node-sdch-proxy tests:', function() {
     describe('Initial Interaction, User Agent has No Dictionaries', function () {
         before(function (done) {
             http.get({
-                host: config.proxy_host,
-                port: config.proxy_port,
-                path: "http://" + config.test_server_host + ":" + config.test_server_port + "/test2",
+                host: config.proxyHost,
+                port: config.proxyPort,
+                path: "http://" + config.testServerHost + ":" + config.testServerPort + "/test2",
                 headers: {
-                    Host: config.test_server_host,
+                    Host: config.testServerHost,
                     'Accept-Encoding': 'sdch, gzip'
                 }
             }, function (res) {
@@ -106,11 +106,11 @@ describe('Node-sdch-proxy tests:', function() {
     describe('User Agent Requests the Dictionary', function () {
         before(function (done) {
             http.get({
-                host: config.proxy_host,
-                port: config.proxy_port,
-                path: "http://" + config.test_server_host + ":" + config.test_server_port + dict,
+                host: config.proxyHost,
+                port: config.proxyPort,
+                path: "http://" + config.testServerHost + ":" + config.testServerPort + dict,
                 headers: {
-                    Host: config.test_server_host,
+                    Host: config.testServerHost,
                     'Accept-Encoding': 'sdch, gzip'
                 }
             }, function (res) {
@@ -139,7 +139,7 @@ describe('Node-sdch-proxy tests:', function() {
             })
 
             it('valid dictionary headers', function () {
-                var url = "http://" + config.test_server_host + ":" + config.test_server_port + dict
+                var url = "http://" + config.testServerHost + ":" + config.testServerPort + dict
                 assert.doesNotThrow(function () {
                     var opts = sdch.createDictionaryOptions(url, resp.body)
                     var dict = sdch.clientUtils.createDictionaryFromOptions(opts)
@@ -152,11 +152,11 @@ describe('Node-sdch-proxy tests:', function() {
     describe('User Requests Page AND User Agent Has Already Downloaded the Dictionary', function () {
         before(function (done) {
             http.get({
-                host: config.proxy_host,
-                port: config.proxy_port,
-                path: "http://" + config.test_server_host + ":" + config.test_server_port + '/search&q=brussel',
+                host: config.proxyHost,
+                port: config.proxyPort,
+                path: "http://" + config.testServerHost + ":" + config.testServerPort + '/search&q=brussel',
                 headers: {
-                    Host: config.test_server_host,
+                    Host: config.testServerHost,
                     'Accept-Encoding': 'sdch',
                     'Avail-Dictionary': 'TWFuIGlz'
                 }

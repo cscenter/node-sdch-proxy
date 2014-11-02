@@ -16,9 +16,9 @@ var app = express();
 // Здесь может быть много словарей
 var dicts = [
   new sdch.SdchDictionary({
-    url: 'http://' + config.test_server_host + ':' + config.test_server_port + config.dictionart_path,
-    domain: config.test_server_host,
-    data: fs.readFileSync(config.dictionary_file)
+    url: 'http://' + config.testServerHost + ':' + config.testServerPort + config.dictionartPath,
+    domain: config.testServerHost,
+    data: fs.readFileSync(config.dictionaryFile)
   })
 ]
 // Создаем хранилище словарей
@@ -60,7 +60,7 @@ app.use(connectSdch.compress({ threshold: '1kb' }, { /* some zlib options */ }))
 app.use(connectSdch.encode({
     // toSend определяет какой словарь будет добавлен в Get-Dictionary
     toSend: function(req, availDicts) {
-        if (url.parse(req.url).hostname == config.test_server_host)
+        if (url.parse(req.url).hostname == config.testServerHost)
             return [dicts[0]]
         else
             return null
@@ -99,7 +99,7 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
             p.pipe(res);
             var parseUrl = url.parse(req.url)
             if (config.domains.indexOf(parseUrl.hostname) != -1) {
-                var dir = config.dictionary_rootdir + '/' + parseUrl.hostname
+                var dir = config.dictionaryRootdir + '/' + parseUrl.hostname
                 mkdirp(dir, function (err) {
                     if (!err) {
                         p.pipe(fs.createWriteStream(dir + '/'
@@ -139,7 +139,7 @@ app.use(function(err, req, res, next) {
     });
 });
 
-app.set('port', config.proxy_port || 3000);
+app.set('port', config.proxyPort || 3000);
 
 function run() {
     var server = app.listen(app.get('port'), function () {
