@@ -13,7 +13,9 @@
     "mkdirp": "~0.5.0",
     "config-node": "~1.2.2",
     "debug": "~2.0.0",
-    "sdch": ">=0.0.2"
+    "sdch": ">=0.0.2",
+    "superagent": "~0.20.0",
+    "mkdirp": "~0.5.0"
   },
   "devDependencies": {
     "chai": "~1.9.2",
