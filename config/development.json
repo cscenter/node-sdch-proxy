@@ -6,5 +6,15 @@
     "dictionartPath": "/dictionaries/search_dict",
     "dictionaryFile": "model.fzm",
     "dictionaryRootdir": "./pages",
-    "domains": ["www.yandex.ru", "ru.wikipedia.org"]
+    "domains": [
+        {
+            "domainName": "yandex.ru",
+            "domainPageInDict": 3
+        },
+        {
+            "domainName": "wikipedia.org",
+            "domainPageInDict": 5
+        }
+    ],
+    "dictionaryGenerator": "update-dict.js"
 }
