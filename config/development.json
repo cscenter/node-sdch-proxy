@@ -1,0 +1,10 @@
+{
+    "proxyHost": "kotik.cc",
+    "proxyPort": 3000,
+    "testServerHost": "kotik.cc",
+    "testServerPort": 7272,
+    "dictionartPath": "/dictionaries/search_dict",
+    "dictionaryFile": "model.fzm",
+    "dictionaryRootdir": "./pages",
+    "domains": ["www.yandex.ru", "ru.wikipedia.org"]
+}

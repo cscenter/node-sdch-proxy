@@ -1,6 +1,6 @@
 var http = require('http');
 var url = require('url');
-var config = require('./config.js');
+var config = require('config-node')();
 
 var server = http.createServer(function(req,resp){
     //что за запрос вообще к нам пришел?
@@ -37,8 +37,8 @@ var server = http.createServer(function(req,resp){
 })
 
 function run() {
-    server.listen(config.SERVER.PORT, config.SERVER.HOST);
-    console.log("test-server listening on port " + config.SERVER.PORT);
+    server.listen(config.testServerPort, config.testServerHost);
+    console.log("test-server listening on port " + config.testServerPort);
 }
 
 if (module.parent) {
