@@ -1,4 +1,4 @@
-#! /usr/local/bin/node
+#!/usr/bin/env node
 var exec = require('child_process').exec;
 var config = require('config-node')();
 

@@ -199,10 +199,16 @@ function getDomain(hostName) {
 
 function isTextContent(res) {
     var CT = res.getHeader('content-type')
-    if (!CT) return false;
-    return CT.substring(0, 4) === 'text'
+    if (!CT) return false
+    return CT.toLowerCase().startsWith('text')
 }
 
 function randWD(n){  // random words and digits
     return Math.random().toString(36).slice(2, 2 + Math.max(1, Math.min(n, 10)) );
 } //result is such as "46c17fkfpl"
+
+if (typeof String.prototype.startsWith != 'function') {
+    String.prototype.startsWith = function( str ) {
+        return str.length > 0 && this.substring(0, str.length) === str;
+    }
+}
