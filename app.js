@@ -23,9 +23,8 @@ var dicts = [
     data: fs.readFileSync(config.dictionaryFile)
   })
 ]
-var domainHits = new Array(config.domains.length);
-for (var i = 0; i < domainHits.length; i++) {
-    domainHits[i] = 0
+for(var i = 0; i < config.domains.length; i++) {
+    config.domains[i].hits = 0
 }
 // Создаем хранилище словарей
 var storage = new connectSdch.DictionaryStorage(dicts);
@@ -114,7 +113,6 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
                     if (!err) {
                         var shasum = crypto.createHash('sha256')
                         shasum.update(parseUrl.path)
-                        console.log(p.headers['content-type'], parseUrl.path)
                         var urlSha256 = shasum.digest('hex')
                         p.pipe(fs.createWriteStream(dir + '/' + urlSha256, {flags: 'w'}))
                             .on('error', function (err) {
@@ -124,8 +122,8 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
                         console.log(err);
                     }
                 });
-                domainHits[domainNum] += 1
-                if (domainHits[domainNum] == config.domains[domainNum].domainPageInDict) {
+                config.domains[domainNum].hits += 1
+                if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
                     var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
                         function (error, stdout, stderr) {
                             //TODO  перегрузить словарь для домена из этого файла
@@ -140,7 +138,7 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
                                 console.log('exec error: ' + error);
                             }
                         });
-                    domainHits[domainNum] = 0
+                    config.domains[domainNum].hits = 0
                 }
             }
         }).end();
@@ -182,12 +180,6 @@ if (module.parent) {
     exports.run = run
 } else {
     run()
-}
-
-function fixedEncodeURIComponent(str) {
-    return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
-        return '%' + c.charCodeAt(0).toString(16);
-    });
 }
 
 function getDomain(hostName) {
