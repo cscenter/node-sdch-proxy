@@ -158,7 +158,7 @@ describe('Node-sdch-proxy tests:', function() {
                 headers: {
                     Host: config.testServerHost,
                     'Accept-Encoding': 'sdch',
-                    'Avail-Dictionary': 'TWFuIGlz'
+                    'Avail-Dictionary': 'cljJhTSt'
                 }
             }, function (res) {
                 resp = res;

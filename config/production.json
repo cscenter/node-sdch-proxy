@@ -9,12 +9,13 @@
     "domains": [
         {
             "domainName": "yandex.ru",
-            "domainPageInDict": 150
+            "domainPageInDict": 10
         },
         {
             "domainName": "wikipedia.org",
-            "domainPageInDict": 100
+            "domainPageInDict": 10
         }
     ],
-    "dictionaryGenerator": "update-dict.js"
+    "dictionaryGenerator": "update-dict.js",
+    "testPage": "http.html"
 }

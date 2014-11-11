@@ -11,6 +11,7 @@ var connectSdch = require('connect-sdch');
 var config = require('config-node')();
 var mkdirp = require('mkdirp');
 var exec = require('child_process').exec;
+var crypto = require('crypto');
 
 var app = express();
 
@@ -111,8 +112,11 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
                 var dir = config.dictionaryRootdir + '/' + currDomain
                 mkdirp(dir, function (err) {
                     if (!err) {
-                        p.pipe(fs.createWriteStream(dir + '/'
-                            + fixedEncodeURIComponent(parseUrl.path), {flags: 'w'}))
+                        var shasum = crypto.createHash('sha256')
+                        shasum.update(parseUrl.path)
+                        console.log(p.headers['content-type'], parseUrl.path)
+                        var urlSha256 = shasum.digest('hex')
+                        p.pipe(fs.createWriteStream(dir + '/' + urlSha256, {flags: 'w'}))
                             .on('error', function (err) {
                                 console.log("Stream page:", err);
                             })
