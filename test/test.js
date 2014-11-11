@@ -158,7 +158,7 @@ describe('Node-sdch-proxy tests:', function() {
                 headers: {
                     Host: config.testServerHost,
                     'Accept-Encoding': 'sdch',
-                    'Avail-Dictionary': 'TWFuIGlz'
+                    'Avail-Dictionary': 'cljJhTSt'
                 }
             }, function (res) {
                 resp = res;
@@ -179,7 +179,7 @@ describe('Node-sdch-proxy tests:', function() {
                 assert.equal('text/plain', resp.headers['content-type']);
             })
 
-            xit("Content-Encoding: contain 'sdch'", function () {
+            it("Content-Encoding: contain 'sdch'", function () {
                 //console.log(resp)
                 assert.include(resp.headers['content-encoding'], 'sdch')
             })

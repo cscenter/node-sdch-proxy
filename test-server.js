@@ -1,44 +1,41 @@
-var http = require('http');
-var url = require('url');
+var express = require('express');
 var config = require('config-node')();
+var fs = require('fs');
 
-var server = http.createServer(function(req,resp){
-    //что за запрос вообще к нам пришел?
-    //console.log(req.method, req.url);
+var data = fs.readFileSync(config.testPage)
+//console.log(data.toString())
+var app = express()
 
-    var parsed_url = url.parse(req.url, true);
-    //console.log(req.headers)
-    if (parsed_url.pathname == '/test1')
-    {
-        resp.setHeader('content-type', 'text/plain');
-        resp.setHeader('content-length', 6);
-        resp.end("Hello!");
-    }
-    else if (parsed_url.pathname == '/test2')
-    {
-        resp.setHeader('content-type', 'text/plain');
-        resp.setHeader('Cache-Control', 'private');
-        resp.setHeader('content-length', 6);
-        resp.end("Hello!");
-    }
-    else if (parsed_url.pathname == '/search&q=brussel')
-    {
-        resp.setHeader('content-type', 'text/plain');
-        resp.setHeader('Cache-Control', 'private');
-        resp.setHeader('content-length', 36);
-        resp.end("Hello!Hello!Hello!Hello!Hello!Hello!");
-    }
-    else
-    {
-        resp.statusCode = 404;
-        resp.end("Sorry, Page Not found!");
-    }
+app.get('/test1', function(req, res) {
+    res.setHeader('content-type', 'text/plain');
+    res.setHeader('content-length', 6);
+    res.end("Hello!");
+})
 
+app.get('/test2', function(req, res) {
+    res.setHeader('content-type', 'text/plain');
+    res.setHeader('Cache-Control', 'private');
+    res.setHeader('content-length', 6);
+    res.end("Hello!");
+})
+
+app.get('/search&q=brussel', function(req, res) {
+    res.setHeader('content-type', 'text/plain');
+    res.setHeader('Cache-Control', 'private');
+    res.setHeader('content-length', 248003);
+    fs.readFile(config.testPage, function (err, data) {
+        if (err) {
+            res.end('Error: ' + err);
+        } else {
+            res.end(data);
+        }
+    });
 })
 
 function run() {
-    server.listen(config.testServerPort, config.testServerHost);
-    console.log("test-server listening on port " + config.testServerPort);
+    var server = app.listen(config.testServerPort, function () {
+        console.log("test-server listening on port " + server.address().port);
+    });
 }
 
 if (module.parent) {

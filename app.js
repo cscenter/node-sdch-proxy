@@ -10,6 +10,8 @@ var sdch = require('sdch');
 var connectSdch = require('connect-sdch');
 var config = require('config-node')();
 var mkdirp = require('mkdirp');
+var exec = require('child_process').exec;
+var crypto = require('crypto');
 
 var app = express();
 
@@ -21,6 +23,9 @@ var dicts = [
     data: fs.readFileSync(config.dictionaryFile)
   })
 ]
+for(var i = 0; i < config.domains.length; i++) {
+    config.domains[i].hits = 0
+}
 // Создаем хранилище словарей
 var storage = new connectSdch.DictionaryStorage(dicts);
 
@@ -43,10 +48,7 @@ app.use(logger('common', { stream: proxyLog }
 app.use(logger(('":method :hostname";Avail-Dictionary:[:req[Avail-Dictionary]];'
                 + ':status;Get-Dictionary:[:res[Get-Dictionary]];'
                 + 'Content-type:[:res[content-type]];Content-Encoding:[:res[content-encoding]];'),
-    { skip: function (req, res) {
-        var CT = res.getHeader('content-type')
-        if (!CT) return true;
-        return CT.substring(0, 4) !== 'text' }, stream: sdchLog }
+    { skip: function (req, res) { return !isTextContent(res) }, stream: sdchLog }
 ))
 
 app.use(connectSdch.compress({ threshold: '1kb' }, { /* some zlib options */ }));
@@ -98,12 +100,21 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
             }
             p.pipe(res);
             var parseUrl = url.parse(req.url)
-            if (config.domains.indexOf(parseUrl.hostname) != -1) {
-                var dir = config.dictionaryRootdir + '/' + parseUrl.hostname
+            var currDomain =  getDomain(parseUrl.hostname)
+            var domainNum = -1
+            for(var i = 0; i < config.domains.length; i++) {
+                if (config.domains[i].domainName == currDomain) {
+                    domainNum = i
+                }
+            }
+            if (domainNum != -1 && isTextContent(res)) {
+                var dir = config.dictionaryRootdir + '/' + currDomain
                 mkdirp(dir, function (err) {
                     if (!err) {
-                        p.pipe(fs.createWriteStream(dir + '/'
-                            + fixedEncodeURIComponent(parseUrl.path), {flags: 'w'}))
+                        var shasum = crypto.createHash('sha256')
+                        shasum.update(parseUrl.path)
+                        var urlSha256 = shasum.digest('hex')
+                        p.pipe(fs.createWriteStream(dir + '/' + urlSha256, {flags: 'w'}))
                             .on('error', function (err) {
                                 console.log("Stream page:", err);
                             })
@@ -111,6 +122,24 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
                         console.log(err);
                     }
                 });
+                config.domains[domainNum].hits += 1
+                if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
+                    var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
+                        function (error, stdout, stderr) {
+                            //TODO  перегрузить словарь для домена из этого файла
+                            console.log('stdout: ' + stdout);
+                            fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
+                                if (err) throw err;
+                                dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
+                                dicts[0].domain = currDomain
+                                dicts[0].data = data
+                            });
+                            if (error !== null) {
+                                console.log('exec error: ' + error);
+                            }
+                        });
+                    config.domains[domainNum].hits = 0
+                }
             }
         }).end();
 });
@@ -153,8 +182,29 @@ if (module.parent) {
     run()
 }
 
-function fixedEncodeURIComponent (str) {
-    return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
-        return '%' + c.charCodeAt(0).toString(16);
-    });
+function getDomain(hostName) {
+    var domain = hostName;
+    if (hostName != null) {
+        var parts = hostName.split('.').reverse();
+        if (parts != null && parts.length > 1) {
+            domain = parts[1] + '.' + parts[0];
+        }
+    }
+    return domain;
+}
+
+function isTextContent(res) {
+    var CT = res.getHeader('content-type')
+    if (!CT) return false
+    return CT.toLowerCase().startsWith('text')
+}
+
+function randWD(n){  // random words and digits
+    return Math.random().toString(36).slice(2, 2 + Math.max(1, Math.min(n, 10)) );
+} //result is such as "46c17fkfpl"
+
+if (typeof String.prototype.startsWith != 'function') {
+    String.prototype.startsWith = function( str ) {
+        return str.length > 0 && this.substring(0, str.length) === str;
+    }
 }
