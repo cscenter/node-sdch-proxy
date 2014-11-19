@@ -30,6 +30,7 @@ for(var i = 0; i < config.domains.length; i++) {
 var storage = new connectSdch.DictionaryStorage(dicts);
 
 // create a write stream (in append mode)
+mkdirp(__dirname + '/logs')
 var proxyErrLog = fs.createWriteStream(__dirname + '/logs/proxy-error.log', {flags: 'w'})
 var proxyLog = fs.createWriteStream(__dirname + '/logs/proxy.log', {flags: 'w'})
 var sdchLog = fs.createWriteStream(__dirname + '/logs/sdch.log', {flags: 'w'})
@@ -109,7 +110,7 @@ app.get('/*', function proxy(req, res, next) { // get по любому url
             }
             if (domainNum != -1 && isTextContent(res)) {
                 var dir = config.dictionaryRootdir + '/' + currDomain
-                mkdirp(dir, function (err) {
+                 mkdirp(dir, function (err) {
                     if (!err) {
                         var shasum = crypto.createHash('sha256')
                         shasum.update(parseUrl.path)
