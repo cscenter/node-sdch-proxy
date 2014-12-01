@@ -82,67 +82,86 @@ app.use(connectSdch.encode({
 app.use(connectSdch.serve(storage));
 
 // прокся
-app.get('/*', function proxy(req, res, next) { // get по любому url
-    res.setHeader('Via', 'My-precious-proxy');
-    request.get(req.url)  // проксируем get
-        .set(req.headers)
-        .request()          // дождались ответа  --> вернет объект ответа
-        .on('response', function(resp) {
-            res.statusCode = resp.statusCode;
-            var CE = resp.headers['content-encoding'];
-            var p = resp;
-            if (CE === 'gzip') {
-                p = resp.pipe(zlib.createGunzip());
-                delete resp.headers['content-encoding'];
-            }
-            // копируем заголовки ответа удаленной стороны в наш ответ
-            for (var k in resp.headers) {
-                res.setHeader(k, resp.headers[k]);
-            }
-            p.pipe(res);
-            var parseUrl = url.parse(req.url)
-            var currDomain =  getDomain(parseUrl.hostname)
-            var domainNum = -1
-            for(var i = 0; i < config.domains.length; i++) {
-                if (config.domains[i].domainName == currDomain) {
-                    domainNum = i
-                }
-            }
-            if (domainNum != -1 && isTextContent(res)) {
-                var dir = config.dictionaryRootdir + '/' + currDomain
-                 mkdirp(dir, function (err) {
-                    if (!err) {
-                        var shasum = crypto.createHash('sha256')
-                        shasum.update(parseUrl.path)
-                        var urlSha256 = shasum.digest('hex')
-                        p.pipe(fs.createWriteStream(dir + '/' + urlSha256, {flags: 'w'}))
-                            .on('error', function (err) {
-                                console.log("Stream page:", err);
-                            })
-                    } else {
-                        console.log(err);
-                    }
-                });
-                config.domains[domainNum].hits += 1
-                if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
-                    var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
-                        function (error, stdout, stderr) {
-                            //TODO  перегрузить словарь для домена из этого файла
-                            console.log('stdout: ' + stdout);
-                            fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
-                                if (err) throw err;
-                                dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
-                                dicts[0].domain = currDomain
-                                dicts[0].data = data
-                            });
-                            if (error !== null) {
-                                console.log('exec error: ' + error);
-                            }
-                        });
-                    config.domains[domainNum].hits = 0
-                }
-            }
-        }).end();
+app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по любому url
+    clinetResponse.setHeader('Via', 'My-precious-proxy');
+
+
+    //мой вариант
+    var options = url.parse(clientRequest.url);
+    options.headers = clientRequest.headers;
+    console.log(options);
+    http.request(options, function(serverResponse) {
+        clinetResponse.statusCode = serverResponse.statusCode;
+        var CE = serverResponse.headers['content-encoding'];
+        var p = serverResponse;
+        console.log(serverResponse);
+        //// копируем заголовки ответа удаленной стороны в наш ответ
+        for (var k in serverResponse.headers) {
+            clinetResponse.setHeader(k, serverResponse.headers[k]);
+        }
+        p.pipe(clinetResponse);
+    }).end();
+
+    //старый вариант
+    //request.get(clientRequest.url)  // проксируем get
+    //    .set(clientRequest.headers)
+    //    .request()          // дождались ответа  --> вернет объект ответа
+    //    .on('response', function(serverResponse) {
+    //        clinetResponse.statusCode = serverResponse.statusCode;
+    //        var CE = serverResponse.headers['content-encoding'];
+    //        var p = serverResponse;
+    //        if (CE === 'gzip') {
+    //            p = serverResponse.pipe(zlib.createGunzip());
+    //            delete serverResponse.headers['content-encoding'];
+    //        }
+    //        // копируем заголовки ответа удаленной стороны в наш ответ
+    //        for (var k in serverResponse.headers) {
+    //            clinetResponse.setHeader(k, serverResponse.headers[k]);
+    //        }
+    //        p.pipe(clinetResponse);
+    //        var parseUrl = url.parse(clientRequest.url)
+    //        var currDomain =  getDomain(parseUrl.hostname)
+    //        var domainNum = -1
+    //        for(var i = 0; i < config.domains.length; i++) {
+    //            if (config.domains[i].domainName == currDomain) {
+    //                domainNum = i
+    //            }
+    //        }
+    //        if (domainNum != -1 && isTextContent(clinetResponse)) {
+    //            var dir = config.dictionaryRootdir + '/' + currDomain
+    //             mkdirp(dir, function (err) {
+    //                if (!err) {
+    //                    var shasum = crypto.createHash('sha256')
+    //                    shasum.update(parseUrl.path)
+    //                    var urlSha256 = shasum.digest('hex')
+    //                    p.pipe(fs.createWriteStream(dir + '/' + urlSha256, {flags: 'w'}))
+    //                        .on('error', function (err) {
+    //                            console.log("Stream page:", err);
+    //                        })
+    //                } else {
+    //                    console.log(err);
+    //                }
+    //            });
+    //            config.domains[domainNum].hits += 1
+    //            if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
+    //                var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
+    //                    function (error, stdout, stderr) {
+    //                        //TODO  перегрузить словарь для домена из этого файла
+    //                        console.log('stdout: ' + stdout);
+    //                        fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
+    //                            if (err) throw err;
+    //                            dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
+    //                            dicts[0].domain = currDomain
+    //                            dicts[0].data = data
+    //                        });
+    //                        if (error !== null) {
+    //                            console.log('exec error: ' + error);
+    //                        }
+    //                    });
+    //                config.domains[domainNum].hits = 0
+    //            }
+    //        }
+    //    }).end();
 });
 
 // error handlers
