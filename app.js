@@ -4,7 +4,6 @@ var express = require('express');
 var fs = require('fs');
 var url = require('url');
 var zlib = require('zlib');
-var request = require('superagent')
 var logger = require('morgan');
 var sdch = require('sdch');
 var connectSdch = require('connect-sdch');
@@ -12,6 +11,7 @@ var config = require('config-node')();
 var mkdirp = require('mkdirp');
 var exec = require('child_process').exec;
 var crypto = require('crypto');
+var http = require('http');
 
 var app = express();
 
@@ -85,108 +85,91 @@ app.use(connectSdch.serve(storage));
 app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по любому url
     clinetResponse.setHeader('Via', 'My-precious-proxy');
 
-
-    //мой вариант
     var options = url.parse(clientRequest.url);
     options.headers = clientRequest.headers;
     console.log(options);
-    http.request(options, function(serverResponse) {
+    http.get(options, function(serverResponse) {
         clinetResponse.statusCode = serverResponse.statusCode;
-        var CE = serverResponse.headers['content-encoding'];
-        var p = serverResponse;
-        console.log(serverResponse);
-        //// копируем заголовки ответа удаленной стороны в наш ответ
-        for (var k in serverResponse.headers) {
-            clinetResponse.setHeader(k, serverResponse.headers[k]);
-        }
-        p.pipe(clinetResponse);
-    }).end();
+                var CE = serverResponse.headers['content-encoding'];
+                var p = serverResponse;
+                if (CE === 'gzip') {
+                    p = serverResponse.pipe(zlib.createGunzip());
+                    delete serverResponse.headers['content-encoding'];
+                }
+                // копируем заголовки ответа удаленной стороны в наш ответ
+                for (var k in serverResponse.headers) {
+                    clinetResponse.setHeader(k, serverResponse.headers[k]);
+                }
+                p.pipe(clinetResponse);
+                var parseUrl = url.parse(clientRequest.url)
+                var currDomain =  getDomain(parseUrl.hostname)
+                var domainNum = -1
+                for(var i = 0; i < config.domains.length; i++) {
+                    if (config.domains[i].domainName == currDomain) {
+                        domainNum = i
+                    }
+                }
+                if (domainNum != -1 && isTextContent(clinetResponse)) {
+                    var dir = config.dictionaryRootdir + '/' + currDomain
+                     mkdirp(dir, function (err) {
+                        if (!err) {
+                            var shasum = crypto.createHash('sha256')
+                            shasum.update(parseUrl.path)
+                            var urlSha256 = shasum.digest('hex')
+                            p.pipe(fs.createWriteStream(dir + '/' + urlSha256, {flags: 'w'}))
+                                .on('error', function (err) {
+                                    console.log("Stream page:", err);
+                                })
+                        } else {
+                            console.log(err);
+                        }
+                    });
+                    config.domains[domainNum].hits += 1
+                    if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
+                        var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
+                            function (error, stdout, stderr) {
+                                //TODO  перегрузить словарь для домена из этого файла
+                                console.log('stdout: ' + stdout);
+                                fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
+                                    if (err) throw err;
+                                    dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
+                                    dicts[0].domain = currDomain
+                                    dicts[0].data = data
+                                });
+                                if (error !== null) {
+                                    console.log('exec error: ' + error);
+                                }
+                            });
+                        config.domains[domainNum].hits = 0
+                    }
+                }
+    });
 
-    //старый вариант
-    //request.get(clientRequest.url)  // проксируем get
-    //    .set(clientRequest.headers)
-    //    .request()          // дождались ответа  --> вернет объект ответа
-    //    .on('response', function(serverResponse) {
-    //        clinetResponse.statusCode = serverResponse.statusCode;
-    //        var CE = serverResponse.headers['content-encoding'];
-    //        var p = serverResponse;
-    //        if (CE === 'gzip') {
-    //            p = serverResponse.pipe(zlib.createGunzip());
-    //            delete serverResponse.headers['content-encoding'];
-    //        }
-    //        // копируем заголовки ответа удаленной стороны в наш ответ
-    //        for (var k in serverResponse.headers) {
-    //            clinetResponse.setHeader(k, serverResponse.headers[k]);
-    //        }
-    //        p.pipe(clinetResponse);
-    //        var parseUrl = url.parse(clientRequest.url)
-    //        var currDomain =  getDomain(parseUrl.hostname)
-    //        var domainNum = -1
-    //        for(var i = 0; i < config.domains.length; i++) {
-    //            if (config.domains[i].domainName == currDomain) {
-    //                domainNum = i
-    //            }
-    //        }
-    //        if (domainNum != -1 && isTextContent(clinetResponse)) {
-    //            var dir = config.dictionaryRootdir + '/' + currDomain
-    //             mkdirp(dir, function (err) {
-    //                if (!err) {
-    //                    var shasum = crypto.createHash('sha256')
-    //                    shasum.update(parseUrl.path)
-    //                    var urlSha256 = shasum.digest('hex')
-    //                    p.pipe(fs.createWriteStream(dir + '/' + urlSha256, {flags: 'w'}))
-    //                        .on('error', function (err) {
-    //                            console.log("Stream page:", err);
-    //                        })
-    //                } else {
-    //                    console.log(err);
-    //                }
-    //            });
-    //            config.domains[domainNum].hits += 1
-    //            if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
-    //                var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
-    //                    function (error, stdout, stderr) {
-    //                        //TODO  перегрузить словарь для домена из этого файла
-    //                        console.log('stdout: ' + stdout);
-    //                        fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
-    //                            if (err) throw err;
-    //                            dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
-    //                            dicts[0].domain = currDomain
-    //                            dicts[0].data = data
-    //                        });
-    //                        if (error !== null) {
-    //                            console.log('exec error: ' + error);
-    //                        }
-    //                    });
-    //                config.domains[domainNum].hits = 0
-    //            }
-    //        }
-    //    }).end();
 });
 
 // error handlers
 
 // development error handler
 // will print stacktrace
-if (app.get('env') === 'development') {
-    app.use(function(err, req, res, next) {
-        res.status(err.status || 500);
-        res.render('error', {
-            message: err.message,
-            error: err
-        });
-    });
-}
+//if (app.get('env') === 'development') {
+//    app.use(function(err, req, res, next) {
+//        res.status(err.status || 500);
+//        res.render('error', {
+//            message: err.message,
+//            error: err
+//        });
+//    });
+//}
 
 // production error handler
 // no stacktraces leaked to user
-app.use(function(err, req, res, next) {
-    res.status(err.status || 500);
-    res.render('error', {
-        message: err.message,
-        error: {}
-    });
-});
+//app.use(function(err, req, res, next) {
+//    res.status(err.status || 500);
+//    res.render('error', {
+//        message: err.message,
+//        error: {}
+//    });
+//});
 
 app.set('port', config.proxyPort || 3000);
 
