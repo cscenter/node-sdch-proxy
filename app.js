@@ -98,22 +98,23 @@ app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
     clinetResponse.setHeader('Via', 'My-precious-proxy');
     var options = url.parse(clientRequest.url);
     options.headers = clientRequest.headers;
+    delete options.headers['Accept-Encoding'];
 
     http.get(options, function (serverResponse) {
         clinetResponse.statusCode = serverResponse.statusCode;
         var CE = serverResponse.headers['content-encoding'];
         var p = serverResponse;
-        if (CE === 'gzip') {
-            p = serverResponse.pipe(zlib.createGunzip());
-            delete serverResponse.headers['content-encoding'];
-        }
+        //if (CE === 'gzip') {
+        //    p = serverResponse.pipe(zlib.createGunzip());
+        //    delete serverResponse.headers['content-encoding'];
+        //}
         // копируем заголовки ответа удаленной стороны в наш ответ
         for (var k in serverResponse.headers) {
             clinetResponse.setHeader(k, serverResponse.headers[k]);
         }
-        var parseUrl = url.parse(clientRequest.url)
-        var currDomain = getDomain(parseUrl.hostname)
-        var domainNum = -1
+        var parseUrl = url.parse(clientRequest.url);
+        var currDomain = getDomain(parseUrl.hostname);
+        var domainNum = -1;
         for (var i = 0; i < config.domains.length; i++) {
             if (config.domains[i].domainName == currDomain) {
                 domainNum = i
@@ -156,7 +157,7 @@ app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
                     console.log(err);
                 }
             });
-            config.domains[domainNum].hits += 1
+            config.domains[domainNum].hits += 1;
             if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
                 var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
                     function (error, stdout, stderr) {
@@ -165,8 +166,8 @@ app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
                         fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
                             if (err) throw err;
                             dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
-                            dicts[0].domain = currDomain
-                            dicts[0].data = data
+                            dicts[0].domain = currDomain;
+                            dicts[0].data = data;
                         });
                         if (error !== null) {
                             console.log('exec error: ' + error);
