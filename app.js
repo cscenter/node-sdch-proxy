@@ -97,87 +97,106 @@ app.use(connectSdch.serve(storage));
 app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по любому url
     clinetResponse.setHeader('Via', 'My-precious-proxy');
     var options = url.parse(clientRequest.url);
+    options.method = clientRequest.method;
+
     options.headers = clientRequest.headers;
     delete options.headers['Accept-Encoding'];
+    options.headers['X-Real-IP'] = options.headers['X-Real-IP'] || clientRequest.ip;
+    options.headers['X-Forwarded-Proto'] = options.headers['X-Forwarded-Proto'] || clientRequest.protocol;
+    if(options.headers['X-Forwarded-For']) {
+        options.headers['X-Forwarded-For'] = options.headers['X-Forwarded-For'] + ", " + clientRequest.ip;
+    } else {
+        options.headers['X-Forwarded-For'] = clientRequest.ip;
+    }
 
-    http.get(options, function (serverResponse) {
-        clinetResponse.statusCode = serverResponse.statusCode;
-        var CE = serverResponse.headers['content-encoding'];
-        var p = serverResponse;
-        //if (CE === 'gzip') {
-        //    p = serverResponse.pipe(zlib.createGunzip());
-        //    delete serverResponse.headers['content-encoding'];
-        //}
-        // копируем заголовки ответа удаленной стороны в наш ответ
-        for (var k in serverResponse.headers) {
-            clinetResponse.setHeader(k, serverResponse.headers[k]);
-        }
-        var parseUrl = url.parse(clientRequest.url);
-        var currDomain = getDomain(parseUrl.hostname);
-        var domainNum = -1;
-        for (var i = 0; i < config.domains.length; i++) {
-            if (config.domains[i].domainName == currDomain) {
-                domainNum = i
+    if(clientRequest.method != "GET") {
+        var proxyRequest = http.request(options, function (serverResponse) {
+            for (var k in serverResponse.headers) {
+                clinetResponse.setHeader(k, serverResponse.headers[k]);
             }
-        }
+            serverResponse.pipe(clinetResponse);
+        });
+        clientRequest.pipe(proxyRequest);
+    } else {
+        http.get(options, function (serverResponse) {
+            clinetResponse.statusCode = serverResponse.statusCode;
+            var CE = serverResponse.headers['content-encoding'];
+            var p = serverResponse;
+            //if (CE === 'gzip') {
+            //    p = serverResponse.pipe(zlib.createGunzip());
+            //    delete serverResponse.headers['content-encoding'];
+            //}
+            // копируем заголовки ответа удаленной стороны в наш ответ
+            for (var k in serverResponse.headers) {
+                clinetResponse.setHeader(k, serverResponse.headers[k]);
+            }
+            var parseUrl = url.parse(clientRequest.url);
+            var currDomain = getDomain(parseUrl.hostname);
+            var domainNum = -1;
+            for (var i = 0; i < config.domains.length; i++) {
+                if (config.domains[i].domainName == currDomain) {
+                    domainNum = i
+                }
+            }
 
-        if (domainNum === -1 || !isTextContent(clinetResponse)) {
-            p.pipe(clinetResponse);
-        } else {
-            var domainDir = config.dictionaryRootdir + '/' + currDomain
-            mkdirp(domainDir, function (err) {
-                if (!err) {
-                    var randomName = tempFileDir + '/' + currDomain + '_' + randWD(20) + ".tmp";
-                    var hash = crypto.createHash('md5')
-                    var fileStream = fs.createWriteStream(randomName, {flags: 'w'});
-                    p.on('readable', function() {
-                        var chunk;
-                        while (null !== (chunk = p.read())) {
-                            clinetResponse.write(chunk);
-                            hash.write(chunk);
-                            fileStream.write(chunk);
-                        }
-                    })
-                    .on('end', function() {
-                        hash.end();
-                        fileStream.end();
-                        clinetResponse.end();
-                        var hashName = hash.read().toString('hex');
-                        fs.rename(randomName, domainDir + '/' + hashName, function (err) {
-                            if (err) {
-                                console.log("NOT RENAMED: " + randomName + " hash: " + hashName);
+            if (domainNum === -1 || !isTextContent(clinetResponse)) {
+                p.pipe(clinetResponse);
+            } else {
+                var domainDir = config.dictionaryRootdir + '/' + currDomain
+                mkdirp(domainDir, function (err) {
+                    if (!err) {
+                        var randomName = tempFileDir + '/' + currDomain + '_' + randWD(20) + ".tmp";
+                        var hash = crypto.createHash('md5')
+                        var fileStream = fs.createWriteStream(randomName, {flags: 'w'});
+                        p.on('readable', function () {
+                            var chunk;
+                            while (null !== (chunk = p.read())) {
+                                clinetResponse.write(chunk);
+                                hash.write(chunk);
+                                fileStream.write(chunk);
+                            }
+                        })
+                            .on('end', function () {
+                                hash.end();
+                                fileStream.end();
+                                clinetResponse.end();
+                                var hashName = hash.read().toString('hex');
+                                fs.rename(randomName, domainDir + '/' + hashName, function (err) {
+                                    if (err) {
+                                        console.log("NOT RENAMED: " + randomName + " hash: " + hashName);
+                                    }
+                                });
+                            })
+                            .on('error', function (err) {
+                                console.log("Stream page error:", err);
+                            });
+
+                    } else {
+                        console.log(err);
+                    }
+                });
+                config.domains[domainNum].hits += 1;
+                if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
+                    var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
+                        function (error, stdout, stderr) {
+                            //TODO  перегрузить словарь для домена из этого файла
+                            console.log('stdout: ' + stdout);
+                            fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
+                                if (err) throw err;
+                                dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
+                                dicts[0].domain = currDomain;
+                                dicts[0].data = data;
+                            });
+                            if (error !== null) {
+                                console.log('exec error: ' + error);
                             }
                         });
-                    })
-                    .on('error', function (err) {
-                        console.log("Stream page error:", err);
-                    });
-
-                } else {
-                    console.log(err);
+                    config.domains[domainNum].hits = 0
                 }
-            });
-            config.domains[domainNum].hits += 1;
-            if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
-                var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
-                    function (error, stdout, stderr) {
-                        //TODO  перегрузить словарь для домена из этого файла
-                        console.log('stdout: ' + stdout);
-                        fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
-                            if (err) throw err;
-                            dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
-                            dicts[0].domain = currDomain;
-                            dicts[0].data = data;
-                        });
-                        if (error !== null) {
-                            console.log('exec error: ' + error);
-                        }
-                    });
-                config.domains[domainNum].hits = 0
             }
-        }
-    });
 
+        });
+    }
 });
 
 app.set('port', config.proxyPort || 3000);
