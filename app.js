@@ -15,22 +15,48 @@ var http = require('http');
 
 var app = express();
 
-// Здесь может быть много словарей
-var dicts = [
-    new sdch.SdchDictionary({
-        url: 'http://' + config.testServerHost + ':' + config.testServerPort + config.dictionartPath,
-        domain: config.testServerHost,
-        data: fs.readFileSync(config.dictionaryFile)
-    })
-];
+////Здесь может быть много словарей
+//var dictsToServeArray = [
+//    new sdch.SdchDictionary({
+//        url: 'http://' + config.testServerHost + ':' + config.testServerPort + config.dictionartPath,
+//        domain: config.testServerHost,
+//        data: fs.readFileSync(config.dictionaryFile)
+//    })
+//];
+
+var dictsToServeArray = []; // один, самый свежий словарь для каждого обрабатываемого домена
+var domainNameToDictIndexMap = {}; //индекс смого свежего, по домену
+var dictHashToDictMap = {}; // все, когда либо созданные массивы по хешу
+var addDictionary = function(data, domainName, dictUrl) {
+    dictUrl = dictUrl || 'http://' + domainName + '/dictionaries/dict-x' + randWD(13);
+    console.log(dictUrl);
+    var dict =  new sdch.SdchDictionary({
+        url: dictUrl,
+        domain: domainName,
+        data: data
+    });
+    dictHashToDictMap[dict.clientHash] = dict;
+    if(!domainNameToDictIndexMap[domainName]) {
+        domainNameToDictIndexMap[domainName] = dictsToServeArray.length;
+    }
+    console.log(domainNameToDictIndexMap[domainName]);
+    dictsToServeArray[domainNameToDictIndexMap[domainName]] = dict;
+};
+
+addDictionary(
+    fs.readFileSync(config.dictionaryFile),
+    config.testServerHost,
+    'http://' + config.testServerHost + ':' + config.testServerPort + config.dictionartPath
+); //test
+
 for (var i = 0; i < config.domains.length; i++) {
     config.domains[i].hits = 0
 }
 // Создаем хранилище словарей
-var storage = new connectSdch.DictionaryStorage(dicts);
+var storage = new connectSdch.DictionaryStorage(dictsToServeArray);
 
 // create a write stream (in append mode)
-mkdirp(__dirname + '/logs')
+mkdirp(__dirname + '/logs');
 var tempFileDir = __dirname + '/tempFiles';
 mkdirp(tempFileDir);
 var proxyErrLog = fs.createWriteStream(__dirname + '/logs/proxy-error.log', {flags: 'w'})
@@ -75,17 +101,23 @@ app.use(connectSdch.compress({threshold: '1kb'}, {/* some zlib options */}));
 app.use(connectSdch.encode({
     // toSend определяет какой словарь будет добавлен в Get-Dictionary
     toSend: function (req, availDicts) {
-        if (url.parse(req.url).hostname == config.testServerHost)
-            return [dicts[0]]
-        else
-            return null
+        var domainName = getDomain(url.parse(req.url).hostname);
+        console.log(domainName);
+        var dictIndex = domainNameToDictIndexMap[domainName];
+        if (dictIndex) {
+            var dict = dictsToServeArray[dictIndex];
+            if(!availDicts.contains(dict.clientHash)) { // если у клиента нет самого свежего словаря - предложить
+                return dict;
+            }
+        }
+        return null;
     },
     // toEncode определяет какой словарь будет использован для шифрования ответа
     toEncode: function (req, availDicts) {
         // Use only first dictionary
-        if (availDicts.length > 0 &&
-            availDicts[0] === dicts[0].clientHash)
-            return dicts[0]
+        if (availDicts.length > 0 && dictHashToDictMap[availDicts[0]]) { //клиент просит словарь, и он у нас есть
+            return dictHashToDictMap[availDicts[0]];
+        }
         return null;
     }
 }, {/* some vcdiff options */}));
@@ -184,9 +216,7 @@ app.all('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
                             console.log('stdout: ' + stdout);
                             fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
                                 if (err) throw err;
-                                dicts[0].url = 'http://' + currDomain + '/dictionaries/dict-x' + randWD(13)
-                                dicts[0].domain = currDomain;
-                                dicts[0].data = data;
+                                addDictionary(data, currDomain);
                             });
                             if (error !== null) {
                                 console.log('exec error: ' + error);
