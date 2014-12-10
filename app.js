@@ -94,13 +94,12 @@ app.use(connectSdch.encode({
 app.use(connectSdch.serve(storage));
 
 // прокся
-app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по любому url
+app.all('/*', function proxy(clientRequest, clinetResponse, next) { // get по любому url
     clinetResponse.setHeader('Via', 'My-precious-proxy');
     var options = url.parse(clientRequest.url);
     options.method = clientRequest.method;
 
     options.headers = clientRequest.headers;
-    delete options.headers['Accept-Encoding'];
     options.headers['X-Real-IP'] = options.headers['X-Real-IP'] || clientRequest.ip;
     options.headers['X-Forwarded-Proto'] = options.headers['X-Forwarded-Proto'] || clientRequest.protocol;
     if(options.headers['X-Forwarded-For']) {
@@ -111,6 +110,7 @@ app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
 
     if(clientRequest.method != "GET") {
         var proxyRequest = http.request(options, function (serverResponse) {
+            clinetResponse.statusCode = serverResponse.statusCode;
             for (var k in serverResponse.headers) {
                 clinetResponse.setHeader(k, serverResponse.headers[k]);
             }
@@ -118,6 +118,7 @@ app.get('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
         });
         clientRequest.pipe(proxyRequest);
     } else {
+        delete options.headers['Accept-Encoding'];
         http.get(options, function (serverResponse) {
             clinetResponse.statusCode = serverResponse.statusCode;
             var CE = serverResponse.headers['content-encoding'];
