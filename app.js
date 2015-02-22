@@ -6,36 +6,19 @@ var url = require('url');
 var zlib = require('zlib');
 var logger = require('morgan');
 var sdch = require('sdch');
-var connectSdch = require('../connect-sdch');
+var connectSdch = require('connect-sdch');
 var config = require('config-node')();
 var mkdirp = require('mkdirp');
 var exec = require('child_process').exec;
 var crypto = require('crypto');
 var http = require('http');
+var debug = require('debug')('sdch');
 
 var app = express();
-
-////Здесь может быть много словарей
-//var initialDictionaries = [
-//    new sdch.SdchDictionary({
-//        url: 'http://' + config.testServerHost + ':' + config.testServerPort + config.dictionartPath,
-//        domain: config.testServerHost,
-//        data: fs.readFileSync(config.dictionaryFile)
-//    })
-//];
-
-//console.log(d.path);
-
-//var initialDictionaries = [
-//     new sdch.SdchDictionary({
-//    url: 'http://' + config.testServerHost + ':' + config.testServerPort + config.dictionartPath,
-//    domain: config.testServerHost,
-//    data: fs.readFileSync(config.dictionaryFile)
-//}) ];
 var storage = new connectSdch.DictionaryStorage([]);
 var addDictionary = function (data, domainName, dictUrl) {
     dictUrl = dictUrl || 'http://' + domainName + '/dictionaries/dict-x' + randWD(13);
-    console.log("Add dict: " + dictUrl);
+    debug("Add dict: " + dictUrl);
     var dict = new sdch.SdchDictionary({
         url: dictUrl,
         domain: domainName,
@@ -102,11 +85,11 @@ app.use(connectSdch.encode({
     // toSend определяет какой словарь будет добавлен в Get-Dictionary
     toSend: function (req, availDicts) {
         var domainName = getDomain(url.parse(req.url).hostname);
-        console.log("To send: " + domainName);
+        debug("To send: " + domainName);
         var dict = storage.getByDomain(domainName);
         if (dict){
             if (availDicts.indexOf(dict.clientHash) < 0) { // если у клиента нет самого свежего словаря - предложить
-                console.log("Sended: " + dict.clientHash);
+                debug("Sended: " + dict.clientHash);
                 return dict;
             }
         }
@@ -115,7 +98,7 @@ app.use(connectSdch.encode({
     // toEncode определяет какой словарь будет использован для шифрования ответа
     toEncode: function (req, availDicts) {
         var domainName = getDomain(url.parse(req.url).hostname);
-        console.log("To encode: " + domainName);
+        debug("To encode: " + domainName);
         var availDictsMap = {};
         availDicts.forEach(function(e) {
             availDictsMap[e] = true;
@@ -136,18 +119,20 @@ app.use(connectSdch.serve(storage));
 
 // прокся
 app.all('/*', function proxy(clientRequest, clinetResponse, next) { // get по любому url
-    //console.log(url.parse(clientRequest.url).hostname);
-    //console.log(clientRequest.url);
-    console.log("Request HEADERS: ");
+    debug("req: " + clientRequest.url);
+    debug("Request HEADERS: ");
     for (var k in clientRequest.headers) {
-        console.log(k + " : " + clientRequest.headers[k]);
+        debug(k + " : " + clientRequest.headers[k]);
 
     }
     clinetResponse.setHeader('Via', 'My-precious-proxy');
     var options = url.parse(clientRequest.url);
     options.method = clientRequest.method;
 
-    options.headers = clientRequest.headers;
+    options.headers = {};
+    for (var h in clientRequest.headers) {
+        options.headers[h] = clientRequest.headers[h];
+    }
     options.headers['X-Real-IP'] = options.headers['X-Real-IP'] || clientRequest.ip;
     options.headers['X-Forwarded-Proto'] = options.headers['X-Forwarded-Proto'] || clientRequest.protocol;
     if (options.headers['X-Forwarded-For']) {
@@ -168,27 +153,25 @@ app.all('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
         clientRequest.pipe(proxyRequest);
     } else {
         delete options.headers['accept-encoding']; // временное решение баги с едущей разметкой
-        delete options.headers['Accept-Encoding']; // временное решение баги с едущей разметкой
-        console.log("Headers: ");
-        for(var h in options.headers) {
-            console.log(h + " : " + options.headers[h]);
-        }
+   //     debug("Headers: ");
+   //     for(var h in options.headers) {
+   //         debug(h + " : " + options.headers[h]);
+   //     }
         proxyRequest = http.get(options, function (serverResponse) {
             clinetResponse.statusCode = serverResponse.statusCode;
             var CE = serverResponse.headers['content-encoding'];
-             CE = CE || serverResponse.headers['Content-Encoding'];
-            console.log("responce encoding: " + CE)
+            debug("responce encoding: " + CE)
             var p = serverResponse;
             //if (CE === 'gzip') {
             //    p = serverResponse.pipe(zlib.createGunzip());
             //    delete serverResponse.headers['content-encoding'];
-            //}
+            //} // нужно если было бы сжатие
+
             // копируем заголовки ответа удаленной стороны в наш ответ
-            console.log("Response headers: ");
+            debug("Response headers: ");
             for (var k in serverResponse.headers) {
                 clinetResponse.setHeader(k, serverResponse.headers[k]);
-                console.log(k + " " + serverResponse.headers[k]);
-
+                debug(k + " " + serverResponse.headers[k]);
             }
             var parseUrl = url.parse(clientRequest.url);
             var currDomain = getDomain(parseUrl.hostname);
@@ -202,7 +185,7 @@ app.all('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
             if (domainNum === -1 || !isTextContent(clinetResponse)) {
                 p.pipe(clinetResponse);
             } else {
-                console.log(url.parse(clientRequest.url).hostname);
+                debug(url.parse(clientRequest.url).hostname);
                 var domainDir = config.dictionaryRootdir + '/' + currDomain;
                 mkdirp(domainDir, function (err) {
                     if (!err) {
@@ -222,34 +205,24 @@ app.all('/*', function proxy(clientRequest, clinetResponse, next) { // get по 
                                 fileStream.end();
                                 clinetResponse.end();
                                 var hashName = hash.read().toString('hex');
-                                console.log("rename from " + randomName + " to " + domainDir + '/' + hashName);
+                                debug("rename from " + randomName + " to " + domainDir + '/' + hashName);
                                 fs.rename(randomName, domainDir + '/' + hashName, function (err) {
                                     if (err) {
-                                        console.log("NOT RENAMED: " + randomName + " hash: " + hashName);
+                                        cosole.log("NOT RENAMED: " + randomName + " hash: " + hashName);
                                     } else {
                                         config.domains[domainNum].hits += 1;
                                         if (config.domains[domainNum].hits == config.domains[domainNum].domainPageInDict) {
                                             var child = exec('./' + config.dictionaryGenerator + ' ' + currDomain,
                                                 function (error, stdout, stderr) {
-                                                    console.log('stdout: ' + stdout);
+                                                    debug('stdout: ' + stdout);
                                                     if (error !== null) {
-                                                        console.log('exec error: ' + error);
+                                                        debug('exec error: ' + error);
                                                     } else {
                                                         fs.readFile(stdout.replace(/\n/, ''), function (err, data) {
                                                             if (err) {
-                                                                console.log(err);
+                                                                debug(err);
                                                             } else {
                                                                 addDictionary(data, currDomain);
-                                                                //console.log("Dictionaries avalible");
-                                                                //for(var i = 0; i < storage.dicts().length; ++i) {
-                                                                //    console.log(storage.dicts()[i].url)
-                                                                //    console.log(storage.dicts()[i].domain)
-                                                                //    console.log(storage.dicts()[i].clientHash)
-                                                                //}
-                                                                //
-                                                                //console.log("Dict end");
-
-
                                                             }
                                                         });
                                                     }
