@@ -9,11 +9,11 @@
     "domains": [
         {
             "domainName": "yandex.ru",
-            "domainPageInDict": 10
+            "domainPageInDict": 2
         },
         {
             "domainName": "wikipedia.org",
-            "domainPageInDict": 10
+            "domainPageInDict": 2
         }
     ],
     "dictionaryGenerator": "update-dict.js",

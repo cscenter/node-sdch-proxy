@@ -1,0 +1,4 @@
+pages/*
+logs
+node_modules
+tempFiles
